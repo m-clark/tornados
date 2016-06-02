@@ -1,0 +1,103 @@
+---
+title: "Tornados 1950-2015"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard); library(dplyr); library(plotly)
+
+```
+
+
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### 
+
+```{r}
+load('data/tornados.RData')
+library(plotly)
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showland = TRUE,
+  landcolor = toRGB("gray99"),
+  subunitcolor = toRGB("gray85"),
+  countrycolor = toRGB("gray85"),
+  countrywidth = 0.25,
+  subunitwidth = 0.25
+)
+
+tornados$Size= scales::rescale(tornados$Size, to=c(5,20))
+
+m <- list(sizebar = list(title = "F Scale"),  opacity = 0.05,
+          symbol = 'dot', size=tornados$Size, color=toRGB('darkred'))
+
+# note that rstudio will not display this, but saving as webpage will
+tornado_plot =   tornados %>% 
+    select(StartLat, StartLon, Year, Fatalities, Injuries, Fscale) %>%
+    mutate(display = paste0('F', Fscale,'<br>',
+                            'Fatalities: ', Fatalities, '<br>',
+                            'Injuries: ', Injuries),
+           bubsize = (Fscale+1)^1.5) %>% 
+    filter(Year==1974) %>% 
+    na.omit() %>% 
+    plot_ly(lat = StartLat, lon = StartLon, 
+            color=c(Fscale,5), 
+            colors=rev(RColorBrewer::brewer.pal(6, 'RdBu')),
+            hoverinfo='text',
+            text=display,
+            textposition='middle right',
+            type = 'scattergeo', locationmode = 'USA-states', mode = 'markers',
+            marker = list(m[[1]], size = bubsize, colorbar = list(title = "F Scale"))) %>%   #note that if you specify size in the main plotly area, it won't display text properly
+    layout(geo = g)
+tornado_plot
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Monthly Counts
+
+```{r}
+f <- list(family = "Open Sans",  size = 18,  color = "#7f7f7f")
+x <- list(title = "",  titlefont = f, tickvals=paste0(seq(1950,2015,5),'_',1), tickmode='array', tickangle=90)
+y <- list(title = "Number of Tornados",  titlefont = f)
+
+tornados %>% 
+  group_by(Month, Year) %>% 
+  summarise(N = length(Fscale)) %>% 
+  mutate(YearMonth = paste0(Year, '_', Month)) %>% 
+  ungroup() %>% 
+  arrange(Year, Month) %>% 
+  plot_ly(x=YearMonth, y=N) %>% 
+  layout(xaxis=x, yaxis=y, margin=list(b=40))
+```
+
+### Yearly Counts
+
+```{r}
+require(mgcv)
+yearly = tornados %>% 
+  group_by(Year) %>% 
+  summarise(N = length(Fscale)) %>% 
+  arrange(Year)
+yearlyfits = fitted(gam(N~s(Year, bs='gp'), data=yearly))
+y <- list(title = "Number of Tornados",  titlefont = f, showgrid=F)
+f5 = tornados %>% 
+  group_by(Year) %>% 
+  summarise(F5s = sum(Fscale>=3)) %>% 
+  arrange(Year)
+y2 <- list(tickfont = list(color = "green"),overlaying = "y", side = "right", showgrid=F, tickformat='###')
+yearly %>% 
+  plot_ly(x=Year, y=N, name='Count') %>% 
+  add_trace(x=Year, y=yearlyfits, name='Trend') %>% 
+  add_trace(x=Year, y=F5s, data=f5, yaxis='y2', name='F3 or greater', opacity=.2) %>% 
+  layout(xaxis=x, yaxis=y, yaxis2=y2, showlegend=F, margin=list(r=40))
+```
+
