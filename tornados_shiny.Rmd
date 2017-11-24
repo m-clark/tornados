@@ -100,14 +100,16 @@ tornados %>%
 ### Yearly Counts
 
 ```{r}
-require(mgcv)
+
+
+
 yearly = tornados %>% 
   group_by(Year) %>% 
   summarise(N = length(Fscale)) %>% 
   arrange(Year)
 yearlyfits = fitted(gam(N~s(Year, bs='gp'), data=yearly))
 y <- list(title = "Number of Tornados",  titlefont = f, showgrid=F)
-f5 = tornados %>% 
+f5 = tornados %>%  
   group_by(Year) %>% 
   summarise(F5s = sum(Fscale>=3)) %>% 
   arrange(Year)
